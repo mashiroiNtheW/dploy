@@ -3,7 +3,8 @@ const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
 const cors = require("cors")
-const app = require(express);
+const express = require("express");
+const app = express();
 
 app.use(cors({
   origin: 'https://mashirointhew.github.io'
