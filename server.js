@@ -4,9 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const port = Number(process.env.PORT) || 3000;
-
-// Update this to your specific GitHub URL
-const allowedOrigin = "https://mashirointhew.github.io"; 
+const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
 
 const dataFile = path.join(__dirname, "data", "dates.json");
 
@@ -30,13 +28,10 @@ async function writeDates(dates) {
   await fs.writeFile(dataFile, `${JSON.stringify(dates, null, 2)}\n`, "utf8");
 }
 
-/**
- * Updated to include the CORS header
- */
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": allowedOrigin, // <--- THE FIX
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   });
@@ -46,35 +41,17 @@ function sendJson(response, statusCode, body) {
 function parseRequestBody(request) {
   return new Promise((resolve, reject) => {
     let rawBody = "";
-    request.on("data", (chunk) => {
-      rawBody += chunk;
-      if (rawBody.length > 1_000_000) {
-        reject(new Error("Request body too large"));
-        request.destroy();
-      }
-    });
+    request.on("data", (chunk) => { rawBody += chunk; });
     request.on("end", () => {
-      try {
-        resolve(JSON.parse(rawBody || "{}"));
-      } catch {
-        reject(new Error("Invalid JSON body"));
-      }
+      try { resolve(JSON.parse(rawBody || "{}")); } 
+      catch { reject(new Error("Invalid JSON")); }
     });
     request.on("error", reject);
   });
 }
 
-function isValidIsoDate(value) {
-  return !Number.isNaN(Date.parse(value));
-}
-
 const server = http.createServer(async (request, response) => {
-  if (!request.url) {
-    sendJson(response, 400, { error: "Missing request URL" });
-    return;
-  }
-
-  // Handle the "Preflight" request
+  // Handle CORS Preflight
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
       "Access-Control-Allow-Origin": allowedOrigin,
@@ -87,26 +64,26 @@ const server = http.createServer(async (request, response) => {
 
   const url = new URL(request.url, `http://${request.headers.host}`);
 
-  // Route: GET /api/dates
+  // GET Route
   if (request.method === "GET" && url.pathname === "/api/dates") {
     try {
       const dates = await readDates();
       sendJson(response, 200, dates);
     } catch (error) {
-      sendJson(error, 500, { error: error.message });
+      sendJson(response, 500, { error: error.message });
     }
     return;
   }
 
-  // Route: POST /api/dates
+  // POST Route
   if (request.method === "POST" && url.pathname === "/api/dates") {
     try {
       const body = await parseRequestBody(request);
       const label = String(body.label || "").trim();
-      const date = String(body.date || "").trim();
+      const dateValue = new Date(body.date);
 
-      if (!label || !date) {
-        sendJson(response, 400, { error: "Both label and date are required" });
+      if (!label || Number.isNaN(dateValue.getTime())) {
+        sendJson(response, 400, { error: "Valid label and date are required" });
         return;
       }
 
@@ -114,9 +91,8 @@ const server = http.createServer(async (request, response) => {
       const newEntry = {
         id: crypto.randomUUID(),
         label,
-        date: new Date(date).toISOString(),
+        date: dateValue.toISOString(),
       };
-
       dates.push(newEntry);
       await writeDates(dates);
       sendJson(response, 201, newEntry);
@@ -129,6 +105,4 @@ const server = http.createServer(async (request, response) => {
   sendJson(response, 404, { error: "Not found" });
 });
 
-server.listen(port, () => {
-  console.log(`API listening on port ${port}`);
-});
+server.listen(port, () => console.log(`Server on port ${port}`));
