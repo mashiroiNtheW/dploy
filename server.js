@@ -5,17 +5,14 @@ const crypto = require("crypto");
 
 const port = Number(process.env.PORT) || 3000;
 
-/** * This is the fix. We use the environment variable if provided by Railway, 
- * otherwise we default to your GitHub Pages URL.
- */
-const allowedOrigin = process.env.ALLOWED_ORIGIN || "https://mashirointhew.github.io";
+// Update this to your specific GitHub URL
+const allowedOrigin = "https://mashirointhew.github.io"; 
 
 const dataFile = path.join(__dirname, "data", "dates.json");
 
 async function ensureDataFile() {
   const directory = path.dirname(dataFile);
   await fs.mkdir(directory, { recursive: true });
-
   try {
     await fs.access(dataFile);
   } catch {
@@ -34,12 +31,12 @@ async function writeDates(dates) {
 }
 
 /**
- * Handles sending JSON and setting the necessary CORS headers
+ * Updated to include the CORS header
  */
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": allowedOrigin, // <--- THE FIX
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   });
@@ -49,7 +46,6 @@ function sendJson(response, statusCode, body) {
 function parseRequestBody(request) {
   return new Promise((resolve, reject) => {
     let rawBody = "";
-
     request.on("data", (chunk) => {
       rawBody += chunk;
       if (rawBody.length > 1_000_000) {
@@ -57,7 +53,6 @@ function parseRequestBody(request) {
         request.destroy();
       }
     });
-
     request.on("end", () => {
       try {
         resolve(JSON.parse(rawBody || "{}"));
@@ -65,7 +60,6 @@ function parseRequestBody(request) {
         reject(new Error("Invalid JSON body"));
       }
     });
-
     request.on("error", reject);
   });
 }
@@ -80,7 +74,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  // IMPORTANT: Handle Browser Preflight (OPTIONS)
+  // Handle the "Preflight" request
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
       "Access-Control-Allow-Origin": allowedOrigin,
@@ -93,18 +87,18 @@ const server = http.createServer(async (request, response) => {
 
   const url = new URL(request.url, `http://${request.headers.host}`);
 
-  // GET Route
+  // Route: GET /api/dates
   if (request.method === "GET" && url.pathname === "/api/dates") {
     try {
       const dates = await readDates();
       sendJson(response, 200, dates);
     } catch (error) {
-      sendJson(response, 500, { error: error.message });
+      sendJson(error, 500, { error: error.message });
     }
     return;
   }
 
-  // POST Route
+  // Route: POST /api/dates
   if (request.method === "POST" && url.pathname === "/api/dates") {
     try {
       const body = await parseRequestBody(request);
@@ -113,16 +107,6 @@ const server = http.createServer(async (request, response) => {
 
       if (!label || !date) {
         sendJson(response, 400, { error: "Both label and date are required" });
-        return;
-      }
-
-      if (label.length > 80) {
-        sendJson(response, 400, { error: "Label must be 80 characters or less" });
-        return;
-      }
-
-      if (!isValidIsoDate(date)) {
-        sendJson(response, 400, { error: "Date must be a valid ISO timestamp" });
         return;
       }
 
@@ -142,7 +126,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  // 404 Route
   sendJson(response, 404, { error: "Not found" });
 });
 
