@@ -2,11 +2,11 @@ const http = require("http");
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
-const cors = require("cors")
+// const cors = require("cors")
 
-app.use(cors({
-  origin: 'https://mashirointhew.github.io'
-}));
+// app.use(cors({
+//   origin: 'https://mashirointhew.github.io'
+// }));
 
 const port = Number(process.env.PORT) || 3000;
 const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
