@@ -2,16 +2,14 @@ const http = require("http");
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
-const cors = require("cors")
-const express = require("express");
-const app = express();
-
-app.use(cors({
-  origin: 'https://mashirointhew.github.io'
-}));
 
 const port = Number(process.env.PORT) || 3000;
-const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+
+/** * This is the fix. We use the environment variable if provided by Railway, 
+ * otherwise we default to your GitHub Pages URL.
+ */
+const allowedOrigin = process.env.ALLOWED_ORIGIN || "https://mashirointhew.github.io";
+
 const dataFile = path.join(__dirname, "data", "dates.json");
 
 async function ensureDataFile() {
@@ -35,12 +33,15 @@ async function writeDates(dates) {
   await fs.writeFile(dataFile, `${JSON.stringify(dates, null, 2)}\n`, "utf8");
 }
 
+/**
+ * Handles sending JSON and setting the necessary CORS headers
+ */
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   });
   response.end(JSON.stringify(body));
 }
@@ -79,11 +80,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  // IMPORTANT: Handle Browser Preflight (OPTIONS)
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
       "Access-Control-Allow-Origin": allowedOrigin,
       "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     });
     response.end();
     return;
@@ -91,6 +93,7 @@ const server = http.createServer(async (request, response) => {
 
   const url = new URL(request.url, `http://${request.headers.host}`);
 
+  // GET Route
   if (request.method === "GET" && url.pathname === "/api/dates") {
     try {
       const dates = await readDates();
@@ -101,6 +104,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  // POST Route
   if (request.method === "POST" && url.pathname === "/api/dates") {
     try {
       const body = await parseRequestBody(request);
@@ -138,9 +142,10 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  // 404 Route
   sendJson(response, 404, { error: "Not found" });
 });
 
 server.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
+  console.log(`API listening on port ${port}`);
 });
